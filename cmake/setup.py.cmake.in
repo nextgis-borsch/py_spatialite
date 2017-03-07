@@ -161,14 +161,14 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
 
     def build_extension(self,ext):
         # Load includes from module directories first!
-        include_dirs = []
-        include_dirs.extend(self.strip_includes(self.compiler.compiler))
-        include_dirs.extend(self.strip_includes(self.compiler.compiler_so))
-        include_dirs.extend(self.strip_includes(self.compiler.compiler_cxx))
-        include_dirs.extend(self.strip_includes(self.compiler.linker_so))
-        include_dirs.extend(self.strip_includes(self.compiler.linker_exe))
-        include_dirs.extend(self.strip_includes(self.compiler.preprocessor))
-        self.compiler.include_dirs.extend(self.uniq(include_dirs))
+        #include_dirs = []
+        #include_dirs.extend(self.strip_includes(self.compiler.compiler))
+        #include_dirs.extend(self.strip_includes(self.compiler.compiler_so))
+        #include_dirs.extend(self.strip_includes(self.compiler.compiler_cxx))
+        #include_dirs.extend(self.strip_includes(self.compiler.linker_so))
+        #include_dirs.extend(self.strip_includes(self.compiler.linker_exe))
+        #include_dirs.extend(self.strip_includes(self.compiler.preprocessor))
+        #self.compiler.include_dirs.extend(self.uniq(include_dirs))
 
         self.include_dirs.append("@SQLITE3_INCLUDE_DIR@")
         self.include_dirs.append("@SPATIALITE_INCLUDE_DIR@")
@@ -190,7 +190,7 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
 
             ext.define_macros.append(("SQLITE_API","__attribute__((dllimport))"))
 
-        if sys.platform == 'windows':
+        if sys.platform == 'win32':
             ext.define_macros.append(("SQLITE_API","__declspec(dllimport)"))
 
         if self.with_proj:
@@ -222,7 +222,8 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
 
         if self.with_iconv:
             self.include_dirs.append("@ICONV_INCLUDE_DIR@")
-            if sys.platform.startswith("darwin") or not self.compiler.has_function("iconv"):
+            #if sys.platform.startswith("darwin") or not self.compiler.has_function("iconv"):
+            if sys.platform.startswith("darwin"):
                 ext.libraries.append("iconv")
         else:
             ext.extra_compile_args.append("-DOMIT_ICONV")
@@ -266,6 +267,7 @@ def get_setup_args():
                         glob.glob("doc/code/*.py"))]
 
     py_modules = ["spatialite"]
+
     setup_args = dict(
             name = "pyspatialite",
             version = PYSPATIALITE_VERSION + "-alpha-0",

@@ -122,58 +122,87 @@ if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME})
     execute_process(COMMAND ${CMAKE_COMMAND} -E tar xzf ${CMAKE_CURRENT_BINARY_DIR}/${OUT_NAME})
 endif()
 
-macro(get_lib_path_from_include PATH LIB_DIR)
-    get_filename_component(FW_DIR ${PATH} DIRECTORY)
-    get_filename_component(${LIB_DIR} ${FW_DIR} DIRECTORY)
-endmacro()
+if(WIN32)
+    macro(get_lib_path_from_include PATH LIB_DIR)
+        get_filename_component(FW_DIR ${PATH} DIRECTORY)
+        set(${LIB_DIR} "${FW_DIR}/lib")
+    endmacro()
+else()
+    macro(get_lib_path_from_include PATH LIB_DIR)
+        get_filename_component(FW_DIR ${PATH} DIRECTORY)
+        get_filename_component(${LIB_DIR} ${FW_DIR} DIRECTORY)
+    endmacro()
+endif()
 
 set(BUILD_EXT_OPTIONS)
+set(BUILD_INCLUDES)
+set(BUILD_LIB_DIRS)
 
 include(FindAnyProject)
 find_anyproject(SQLite3 REQUIRED)
 set(SQLITE3_FRAMEWORK sqlite3)
 get_lib_path_from_include(${SQLITE3_INCLUDE_DIR} SQLITE3_FRAMEWORK_DIRS)
-set(BUILD_INCLUDES "-I${SQLITE3_INCLUDE_DIR}")
+#set(BUILD_INCLUDES "-I${SQLITE3_INCLUDE_DIR}")
+list(APPEND BUILD_INCLUDES ${SQLITE3_INCLUDE_DIR})
+list(APPEND BUILD_LIB_DIRS ${SQLITE3_FRAMEWORK_DIRS})
 
 find_anyproject(Spatialite REQUIRED)
 set(SPATIALITE_FRAMEWORK spatialite)
 get_lib_path_from_include(${SPATIALITE_INCLUDE_DIR} SPATIALITE_FRAMEWORK_DIRS)
-set(BUILD_INCLUDES "${BUILD_INCLUDES}:${SPATIALITE_INCLUDE_DIR}")
+#set(BUILD_INCLUDES "${BUILD_INCLUDES}:${SPATIALITE_INCLUDE_DIR}")
+list(APPEND BUILD_INCLUDES ${SPATIALITE_INCLUDE_DIR})
+list(APPEND BUILD_LIB_DIRS ${SPATIALITE_LIBRARIES_DIR})
 
 # TODO: Do we need ZLIB here?
 
 find_anyproject(PROJ4 DEFAULT ON)
 if(PROJ4_FOUND)
     set(BUILD_EXT_OPTIONS ${BUILD_EXT_OPTIONS} "--with-proj=1")
-    set(BUILD_INCLUDES "${BUILD_INCLUDES}:${PROJ4_INCLUDE_DIR}")
+    #set(BUILD_INCLUDES "${BUILD_INCLUDES}:${PROJ4_INCLUDE_DIR}")
+    list(APPEND BUILD_INCLUDES ${PROJ4_INCLUDE_DIR})
     set(PROJ4_FRAMEWORK proj)
     get_lib_path_from_include(${PROJ4_INCLUDE_DIR} PROJ4_FRAMEWORK_DIRS)
+    list(APPEND BUILD_LIB_DIRS ${PROJ4_FRAMEWORK_DIRS})
 endif()
 
 find_anyproject(GEOS DEFAULT ON)
 if(GEOS_FOUND)
     set(BUILD_EXT_OPTIONS ${BUILD_EXT_OPTIONS} "--with-geos=1" "--with-geosadvanced=1")
-    set(BUILD_INCLUDES "${BUILD_INCLUDES}:${GEOS_INCLUDE_DIR}")
+    #set(BUILD_INCLUDES "${BUILD_INCLUDES}:${GEOS_INCLUDE_DIR}")
+    list(APPEND BUILD_INCLUDES ${GEOS_INCLUDE_DIR})
     set(GEOS_FRAMEWORK geos)
     get_lib_path_from_include(${GEOS_INCLUDE_DIR} GEOS_FRAMEWORK_DIRS)
+    list(APPEND BUILD_LIB_DIRS ${GEOS_FRAMEWORK_DIRS})
 endif()
 
 find_anyproject(ICONV DEFAULT ON)
 if(ICONV_FOUND)
     set(BUILD_EXT_OPTIONS ${BUILD_EXT_OPTIONS} "--with-iconv=1")
-    set(BUILD_INCLUDES "${BUILD_INCLUDES}:${ICONV_INCLUDE_DIR}")
+    #set(BUILD_INCLUDES "${BUILD_INCLUDES}:${ICONV_INCLUDE_DIR}")
+    list(APPEND BUILD_INCLUDES ${ICONV_INCLUDE_DIR})
+    
+    if(WIN32)
+        get_lib_path_from_include(${ICONV_INCLUDE_DIR} ICONV_LIBRARY_DIR)
+        list(APPEND BUILD_LIB_DIRS ${ICONV_LIBRARY_DIR})
+    endif()
 endif()
 
 find_anyproject(FreeXL)
 if(FREEXL_FOUND)
     set(BUILD_EXT_OPTIONS ${BUILD_EXT_OPTIONS} "--with-freexl=1")
-    set(BUILD_INCLUDES "${BUILD_INCLUDES}:${FREEXL_INCLUDE_DIR}")
+    #set(BUILD_INCLUDES "${BUILD_INCLUDES}:${FREEXL_INCLUDE_DIR}")
+    list(APPEND BUILD_INCLUDES ${FREEXL_INCLUDE_DIR})
+    
     set(FREEXL_FRAMEWORK freexl)
     get_lib_path_from_include(${FREEXL_INCLUDE_DIR} FREEXL_FRAMEWORK_DIRS)
+    list(APPEND BUILD_LIB_DIRS ${FREEXL_FRAMEWORK_DIRS})
 endif()
 
+set(FLAGS)
 if(OSX_FRAMEWORK)
-    set(FLAGS "ARCHFLAGS=-arch x86_64")
+    set(FLAGS ${FLAGS} "ARCHFLAGS=-arch x86_64")
+else(WIN32)
+    set(FLAGS ${FLAGS} "VS90COMNTOOLS=$ENV{VS120COMNTOOLS}")
 endif()
 
 # if(UNIX)
@@ -182,17 +211,28 @@ endif()
 #     set(BUILD_EXT_OPTIONS ${BUILD_EXT_OPTIONS} "-DSQLITE_API=__declspec(dllimport)")
 # endif()
 
+configure_file(${CMAKE_SOURCE_DIR}/cmake/setup.py.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}/setup.py IMMEDIATE @ONLY)
+configure_file(${CMAKE_SOURCE_DIR}/cmake/connection.h.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}/src/connection.h COPYONLY)
+
 macro(build_py ver)
+    if(OSX_FRAMEWORK)
+        string (REPLACE ";" ":" BUILD_INCLUDES "${BUILD_INCLUDES}")
+        set(BUILD_INCLUDES "-I${BUILD_INCLUDES}")
+        set(BUILD_LIB_DIRS "")
+    elseif(WIN32)
+        set(BUILD_INCLUDES "-I${BUILD_INCLUDES}")
+        set(BUILD_LIB_DIRS "-L${BUILD_LIB_DIRS}")
+        set(BUILD_LIB "-lsqlite3_i spatialite iconv")
+    endif()
+
     add_custom_target(build_py${ver} ALL
         COMMAND ${CMAKE_COMMAND} -E env "${FLAGS}"
-        ${PYTHON${ver}_EXECUTABLE} setup.py build_ext ${BUILD_EXT_OPTIONS} ${BUILD_INCLUDES}
+        ${PYTHON${ver}_EXECUTABLE} setup.py build_ext -b ${CMAKE_CURRENT_BINARY_DIR}/${PYTHON${ver}_VERSION_MAJOR}.${PYTHON${ver}_VERSION_MINOR}/site-packages ${BUILD_EXT_OPTIONS} "${BUILD_INCLUDES}" "${BUILD_LIB_DIRS}" ${BUILD_LIB}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}
         VERBATIM
     )
+    
 endmacro()
-
-configure_file(${CMAKE_SOURCE_DIR}/cmake/setup.py.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}/setup.py IMMEDIATE @ONLY)
-configure_file(${CMAKE_SOURCE_DIR}/cmake/connection.h.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}/src/connection.h COPYONLY)
 
 # python setup.py install --prefix=/usr/local
 status_message("Install")
@@ -279,6 +319,9 @@ else()
     macro(install_win_py ver)
         set(BINDING_PATH ${CMAKE_CURRENT_BINARY_DIR}/${PYTHON${ver}_VERSION_MAJOR}.${PYTHON${ver}_VERSION_MINOR}/site-packages)
         install(DIRECTORY "${BINDING_PATH}/"
+                DESTINATION ${INSTALL_LIB_DIR}/Python${PYTHON${ver}_VERSION_MAJOR}${PYTHON${ver}_VERSION_MINOR}/site-packages
+                COMPONENT libraries)
+        install(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}/lib/"
                 DESTINATION ${INSTALL_LIB_DIR}/Python${PYTHON${ver}_VERSION_MAJOR}${PYTHON${ver}_VERSION_MINOR}/site-packages
                 COMPONENT libraries)
     endmacro()
