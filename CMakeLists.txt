@@ -180,7 +180,7 @@ if(ICONV_FOUND)
     set(BUILD_EXT_OPTIONS ${BUILD_EXT_OPTIONS} "--with-iconv=1")
     #set(BUILD_INCLUDES "${BUILD_INCLUDES}:${ICONV_INCLUDE_DIR}")
     list(APPEND BUILD_INCLUDES ${ICONV_INCLUDE_DIR})
-    
+
     if(WIN32)
         get_lib_path_from_include(${ICONV_INCLUDE_DIR} ICONV_LIBRARY_DIR)
         list(APPEND BUILD_LIB_DIRS ${ICONV_LIBRARY_DIR})
@@ -192,7 +192,7 @@ if(FREEXL_FOUND)
     set(BUILD_EXT_OPTIONS ${BUILD_EXT_OPTIONS} "--with-freexl=1")
     #set(BUILD_INCLUDES "${BUILD_INCLUDES}:${FREEXL_INCLUDE_DIR}")
     list(APPEND BUILD_INCLUDES ${FREEXL_INCLUDE_DIR})
-    
+
     set(FREEXL_FRAMEWORK freexl)
     get_lib_path_from_include(${FREEXL_INCLUDE_DIR} FREEXL_FRAMEWORK_DIRS)
     list(APPEND BUILD_LIB_DIRS ${FREEXL_FRAMEWORK_DIRS})
@@ -218,20 +218,23 @@ macro(build_py ver)
     if(OSX_FRAMEWORK)
         string (REPLACE ";" ":" BUILD_INCLUDES "${BUILD_INCLUDES}")
         set(BUILD_INCLUDES "-I${BUILD_INCLUDES}")
-        set(BUILD_LIB_DIRS "")
+
+        add_custom_target(build_py${ver} ALL
+            COMMAND ${CMAKE_COMMAND} -E env "${FLAGS}" ${PYTHON${ver}_EXECUTABLE} setup.py build_ext -b ${CMAKE_CURRENT_BINARY_DIR}/${PYTHON${ver}_VERSION_MAJOR}.${PYTHON${ver}_VERSION_MINOR}/site-packages ${BUILD_EXT_OPTIONS} "${BUILD_INCLUDES}"
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}
+            COMMENT "${BUILD_INCLUDES}"
+            VERBATIM
+        )
     elseif(WIN32)
         set(BUILD_INCLUDES "-I${BUILD_INCLUDES}")
         set(BUILD_LIB_DIRS "-L${BUILD_LIB_DIRS}")
         set(BUILD_LIB "-lsqlite3_i spatialite iconv")
+        add_custom_target(build_py${ver} ALL
+            COMMAND ${CMAKE_COMMAND} -E env "${FLAGS}" ${PYTHON${ver}_EXECUTABLE} setup.py build_ext -b ${CMAKE_CURRENT_BINARY_DIR}/${PYTHON${ver}_VERSION_MAJOR}.${PYTHON${ver}_VERSION_MINOR}/site-packages ${BUILD_EXT_OPTIONS} "${BUILD_INCLUDES}" "${BUILD_LIB_DIRS}" ${BUILD_LIB}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}
+            VERBATIM
+        )
     endif()
-
-    add_custom_target(build_py${ver} ALL
-        COMMAND ${CMAKE_COMMAND} -E env "${FLAGS}"
-        ${PYTHON${ver}_EXECUTABLE} setup.py build_ext -b ${CMAKE_CURRENT_BINARY_DIR}/${PYTHON${ver}_VERSION_MAJOR}.${PYTHON${ver}_VERSION_MINOR}/site-packages ${BUILD_EXT_OPTIONS} "${BUILD_INCLUDES}" "${BUILD_LIB_DIRS}" ${BUILD_LIB}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}
-        VERBATIM
-    )
-    
 endmacro()
 
 # python setup.py install --prefix=/usr/local
