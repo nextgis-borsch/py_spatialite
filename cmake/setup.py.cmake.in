@@ -207,10 +207,12 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
                 ext.extra_link_args.append('@PROJ4_FRAMEWORK@')
                 ext.extra_link_args.append('-F@PROJ4_FRAMEWORK_DIRS@')
                 ext.extra_link_args.append('-mmacosx-version-min=@CMAKE_OSX_DEPLOYMENT_TARGET@')
+            if sys.platform == 'win32':
+                ext.libraries.append('proj4')
+                ext.library_dirs.append('@PROJ4_LIBRARY_DIRS@')
+
         else:
             ext.extra_compile_args.append("-DOMIT_PROJ")
-            ext.libraries.append('proj4')
-            ext.library_dirs.append('@PROJ4_LIBRARY_DIRS@')
 
 
         if self.with_geos:
@@ -227,6 +229,7 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
                 ext.extra_link_args.append('-mmacosx-version-min=@CMAKE_OSX_DEPLOYMENT_TARGET@')
             if self.with_geosadvanced:
                 ext.extra_compile_args.append("-DGEOS_ADVANCED")
+            if sys.platform == 'win32':
                 ext.libraries.append('geos_c')
                 ext.library_dirs.append('@GEOS_LIBRARY_DIRS@')
                 # self.check_lib(ext,"GEOSCoveredBy","geos_c","obsolete 'libgeos_c' (< v.3.3.0). please retry specifying: --without-geosadvanced.",["m","geos"])
@@ -238,10 +241,11 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
             #if sys.platform.startswith("darwin") or not self.compiler.has_function("iconv"):
             if sys.platform.startswith("darwin"):
                 ext.libraries.append("iconv")
+            if sys.platform == 'win32':
+                ext.libraries.append('iconv')
+                ext.library_dirs.append('@ICONV_LIBRARY_DIRS@')
         else:
             ext.extra_compile_args.append("-DOMIT_ICONV")
-            ext.libraries.append('iconv')
-            ext.library_dirs.append('@ICONV_LIBRARY_DIRS@')
 
         if self.with_freexl:
             freexl_include_dirs_str = '@FREEXL_INCLUDE_DIRS@'
@@ -255,10 +259,11 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
                 ext.extra_link_args.append('@FREEXL_FRAMEWORK@')
                 ext.extra_link_args.append('-F@FREEXL_FRAMEWORK_DIRS@')
                 ext.extra_link_args.append('-mmacosx-version-min=@CMAKE_OSX_DEPLOYMENT_TARGET@')
+            if sys.plaform == 'win32':
+                ext.libraries.append('freexl')
+                ext.library_dirs.append('@FREEXL_LIBRARY_DIRS@')
         else:
             ext.extra_compile_args.append("-DOMIT_FREEXL")
-            ext.libraries.append('freexl')
-            ext.library_dirs.append('@FREEXL_LIBRARY_DIRS@')
 
         build_ext.build_extension(self,ext)
 
