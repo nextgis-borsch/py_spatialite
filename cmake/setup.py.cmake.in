@@ -193,6 +193,10 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
 
         if sys.platform == 'win32':
             ext.define_macros.append(("SQLITE_API","__declspec(dllimport)"))
+            ext.libraries.append('sqlite3')
+            ext.library_dirs.append('@SQLITE3_LIBRARY_DIRS@')
+            ext.libraries.append('spatialite')
+            ext.library_dirs.append('@SPATIALITE_LIBRARY_DIRS@')
 
         if self.with_proj:
             ext.include_dirs.append("@PROJ4_INCLUDE_DIRS@")
@@ -205,6 +209,8 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
                 ext.extra_link_args.append('-mmacosx-version-min=@CMAKE_OSX_DEPLOYMENT_TARGET@')
         else:
             ext.extra_compile_args.append("-DOMIT_PROJ")
+            ext.libraries.append('proj4')
+            ext.library_dirs.append('@PROJ4_LIBRARY_DIRS@')
 
 
         if self.with_geos:
@@ -221,6 +227,8 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
                 ext.extra_link_args.append('-mmacosx-version-min=@CMAKE_OSX_DEPLOYMENT_TARGET@')
             if self.with_geosadvanced:
                 ext.extra_compile_args.append("-DGEOS_ADVANCED")
+                ext.libraries.append('geos_c')
+                ext.library_dirs.append('@GEOS_LIBRARY_DIRS@')
                 # self.check_lib(ext,"GEOSCoveredBy","geos_c","obsolete 'libgeos_c' (< v.3.3.0). please retry specifying: --without-geosadvanced.",["m","geos"])
         else:
             ext.extra_compile_args.append("-DOMIT_GEOS")
@@ -232,6 +240,8 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
                 ext.libraries.append("iconv")
         else:
             ext.extra_compile_args.append("-DOMIT_ICONV")
+            ext.libraries.append('iconv')
+            ext.library_dirs.append('@ICONV_LIBRARY_DIRS@')
 
         if self.with_freexl:
             freexl_include_dirs_str = '@FREEXL_INCLUDE_DIRS@'
@@ -247,6 +257,8 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
                 ext.extra_link_args.append('-mmacosx-version-min=@CMAKE_OSX_DEPLOYMENT_TARGET@')
         else:
             ext.extra_compile_args.append("-DOMIT_FREEXL")
+            ext.libraries.append('freexl')
+            ext.library_dirs.append('@FREEXL_LIBRARY_DIRS@')
 
         build_ext.build_extension(self,ext)
 
