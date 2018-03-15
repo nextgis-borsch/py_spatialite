@@ -140,7 +140,7 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
                 yield x
 
     def check_header(self, ext, header):
-        for dir in self.compiler.include_dirs:
+        for dir in ext.include_dirs:
             if os.path.exists(os.path.join(dir,header)):
                 ext.define_macros.append(("HAVE_"+header.upper().replace(".","_"),"1"))
                 return True
@@ -170,14 +170,14 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
         #include_dirs.extend(self.strip_includes(self.compiler.preprocessor))
         #self.compiler.include_dirs.extend(self.uniq(include_dirs))
 
-        self.include_dirs.append("@SQLITE3_INCLUDE_DIR@")
-        self.include_dirs.append("@SPATIALITE_INCLUDE_DIR@")
+        ext.include_dirs.append("@SQLITE3_INCLUDE_DIRS@")
+        ext.include_dirs.append("@SPATIALITE_INCLUDE_DIRS@")
 
         if sys.platform == 'darwin':
-            if [int(x) for x in os.uname()[2].split('.')] >= [11, 0, 0]:
+            # if [int(x) for x in os.uname()[2].split('.')] >= [11, 0, 0]:
                 # since MacOS X 10.9, clang no longer accepts -mno-fused-madd
                 #extra_compile_args.append('-Qunused-arguments')
-                os.environ['ARCHFLAGS'] = '-Wno-error=unused-command-line-argument-hard-error-in-future'
+                # os.environ['ARCHFLAGS'] = '-Wno-error=unused-command-line-argument-hard-error-in-future'
             ext.extra_link_args.append('-framework')
             ext.extra_link_args.append('@SQLITE3_FRAMEWORK@')
             ext.extra_link_args.append('-framework')
@@ -195,7 +195,7 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
             ext.define_macros.append(("SQLITE_API","__declspec(dllimport)"))
 
         if self.with_proj:
-            self.include_dirs.append("@PROJ4_INCLUDE_DIR@")
+            ext.include_dirs.append("@PROJ4_INCLUDE_DIRS@")
             self.check_header(ext,"proj_api.h")
             # self.check_lib(ext,"pj_init_plus", "proj", "'libproj' is required but it doesn't seem to be installed on this system.",["m"])
             if sys.platform == 'darwin':
@@ -208,7 +208,7 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
 
 
         if self.with_geos:
-            self.include_dirs.append("@GEOS_INCLUDE_DIR@")
+            ext.include_dirs.append("@GEOS_INCLUDE_DIRS@")
             self.check_header(ext,"geos_c.h")
             # self.check_lib(ext,"GEOSTopologyPreserveSimplify","geos_c","'libgeos_c' is required but it doesn't seem to be installed on this system.",["m","geos"])
             if sys.platform == 'darwin':
@@ -223,7 +223,7 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
             ext.extra_compile_args.append("-DOMIT_GEOS")
 
         if self.with_iconv:
-            self.include_dirs.append("@ICONV_INCLUDE_DIR@")
+            self.include_dirs.append("@ICONV_INCLUDE_DIRS@")
             #if sys.platform.startswith("darwin") or not self.compiler.has_function("iconv"):
             if sys.platform.startswith("darwin"):
                 ext.libraries.append("iconv")
@@ -231,7 +231,7 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
             ext.extra_compile_args.append("-DOMIT_ICONV")
 
         if self.with_freexl:
-            self.include_dirs.extend("@FREEXL_INCLUDE_DIR@")
+            ext.include_dirs.extend("@FREEXL_INCLUDE_DIRS@")
             self.check_header(ext,"freexl.h")
             # self.check_lib(ext,"freexl_open","freexl","'libfreexl' is required but it doesn't seem to be installed on this system.",["m"])
             if sys.platform == 'darwin':

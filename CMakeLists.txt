@@ -1,9 +1,9 @@
 ################################################################################
-# Project:  Lib Psycopg
+# Project:  Lib spatialite
 # Purpose:  CMake build scripts
 # Author:   Dmitry Baryshnikov, dmitry.baryshnikov@nexgis.com
 ################################################################################
-# Copyright (C) 2017, NextGIS <info@nextgis.com>
+# Copyright (C) 2017-2018, NextGIS <info@nextgis.com>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,15 @@ cmake_minimum_required(VERSION 2.8.12 FATAL_ERROR)
 
 project(pyspatialite)
 
+if(NOT DEFINED PACKAGE_VENDOR)
+    set(PACKAGE_VENDOR NextGIS)
+endif()
+
+if(NOT DEFINED PACKAGE_BUGREPORT)
+    set(PACKAGE_BUGREPORT info@nextgis.com)
+endif()
+
+
 # some init settings
 set(CMAKE_COLOR_MAKEFILE ON)
 # set path to additional CMake modules
@@ -38,11 +47,10 @@ if(OSX_FRAMEWORK AND (BUILD_SHARED_LIBS OR BUILD_STATIC_LIBS))
 endif()
 
 if(OSX_FRAMEWORK)
-  set(INSTALL_LIB_DIR "${CMAKE_INSTALL_PREFIX}/Library" CACHE INTERNAL "Installation directory for libraries" FORCE)
-  set(CMAKE_MACOSX_RPATH ON)
+    set(INSTALL_LIB_DIR "Library" CACHE INTERNAL "Installation directory for libraries" FORCE)
+    set(CMAKE_MACOSX_RPATH ON)
 else()
-    include(GNUInstallDirs)
-    set(INSTALL_LIB_DIR ${CMAKE_INSTALL_FULL_LIBDIR} CACHE INTERNAL "Installation directory for libraries" FORCE)
+    set(INSTALL_LIB_DIR "." CACHE INTERNAL "Installation directory for libraries" FORCE)
 endif()
 
 if(NOT WITH_PYTHON2 AND NOT WITH_PYTHON3)
@@ -92,21 +100,53 @@ endif()
 
 file(DOWNLOAD "https://pypi.python.org/pypi/${PROJECT_NAME}/json" "${CMAKE_CURRENT_BINARY_DIR}/meta.json")
 
+include(util)
+get_compiler_version(COMPILER)
 # get version and download url
 execute_process(COMMAND ${PYTHON_EXECUTABLE}
-    ${CMAKE_SOURCE_DIR}/cmake/pypi_process.py ${PLUGIN} ${CMAKE_CURRENT_BINARY_DIR}/meta.json
+    ${CMAKE_SOURCE_DIR}/cmake/pypi_process.py ${PLUGIN} ${CMAKE_CURRENT_BINARY_DIR}/meta.json ${COMPILER}
     OUTPUT_VARIABLE PACKAGE_DETAILS
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
 list(GET PACKAGE_DETAILS 0 DOWNLOAD_URL)
 list(GET PACKAGE_DETAILS 1 VERSION)
+list(GET PACKAGE_DETAILS 2 IN_VERSION)
+list(GET PACKAGE_DETAILS 3 PROJECT_CPACK_FILENAME)
 
-include(util)
 report_version(${PROJECT_NAME} ${VERSION})
 
+if(OSX_FRAMEWORK)
+    set(FLAGS "ARCHFLAGS=-arch x86_64")
+elseif(WIN32)
+    if(MSVC_VERSION EQUAL 1400)
+        set(FLAGS ${FLAGS} "VS90COMNTOOLS=$ENV{VS80COMNTOOLS}")
+    elseif(MSVC_VERSION EQUAL 1500)
+        set(FLAGS ${FLAGS} "VS90COMNTOOLS=$ENV{VS90COMNTOOLS}")
+    elseif(MSVC_VERSION EQUAL 1600)
+        set(FLAGS ${FLAGS} "VS90COMNTOOLS=$ENV{VS100COMNTOOLS}")
+    elseif(MSVC_VERSION EQUAL 1700)
+        set(FLAGS ${FLAGS} "VS90COMNTOOLS=$ENV{VS110COMNTOOLS}")
+    elseif(MSVC_VERSION EQUAL 1800)
+        set(FLAGS ${FLAGS} "VS90COMNTOOLS=$ENV{VS120COMNTOOLS}")
+    elseif(MSVC_VERSION EQUAL 1900)
+        set(FLAGS ${FLAGS} "VS90COMNTOOLS=$ENV{VS140COMNTOOLS}")
+    else() # 1912 - Need to copy vcvarsall.bat from VC\Auxiliary\Build to VC
+        get_filename_component(_COMNTOOLS_PREFIX "${CMAKE_C_COMPILER}" PATH)
+        get_filename_component(_COMNTOOLS_PREFIX "${_COMNTOOLS_PREFIX}" PATH)
+        get_filename_component(_COMNTOOLS_PREFIX "${_COMNTOOLS_PREFIX}" PATH)
+        get_filename_component(_COMNTOOLS_PREFIX "${_COMNTOOLS_PREFIX}" PATH)
+        get_filename_component(_COMNTOOLS_PREFIX "${_COMNTOOLS_PREFIX}" PATH)
+        get_filename_component(_COMNTOOLS_PREFIX "${_COMNTOOLS_PREFIX}" PATH)
+        # get_filename_component(_COMNTOOLS_PREFIX "${_COMNTOOLS_PREFIX}" PATH)
+        set(FLAGS ${FLAGS} "VS90COMNTOOLS=${_COMNTOOLS_PREFIX}")
+    endif()
+else()
+    set(FLAGS "NextGIS=TRUE")
+endif()
+
 # Download tarbal
-set(OUT_DIR_NAME ${PROJECT_NAME}-${VERSION})
+set(OUT_DIR_NAME ${PROJECT_NAME}-${IN_VERSION})
 set(OUT_NAME "${OUT_DIR_NAME}.tar.gz")
 
 if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/${OUT_NAME}")
@@ -124,13 +164,13 @@ endif()
 
 if(WIN32)
     macro(get_lib_path_from_include PATH LIB_DIR)
-        get_filename_component(FW_DIR ${PATH} DIRECTORY)
+        get_filename_component(FW_DIR ${PATH} PATH)
         set(${LIB_DIR} "${FW_DIR}/lib")
     endmacro()
 else()
     macro(get_lib_path_from_include PATH LIB_DIR)
-        get_filename_component(FW_DIR ${PATH} DIRECTORY)
-        get_filename_component(${LIB_DIR} ${FW_DIR} DIRECTORY)
+        get_filename_component(FW_DIR ${PATH} PATH)
+        get_filename_component(${LIB_DIR} ${FW_DIR} PATH)
     endmacro()
 endif()
 
@@ -141,48 +181,41 @@ set(BUILD_LIB_DIRS)
 include(FindAnyProject)
 find_anyproject(SQLite3 REQUIRED)
 set(SQLITE3_FRAMEWORK sqlite3)
-get_lib_path_from_include(${SQLITE3_INCLUDE_DIR} SQLITE3_FRAMEWORK_DIRS)
-#set(BUILD_INCLUDES "-I${SQLITE3_INCLUDE_DIR}")
-list(APPEND BUILD_INCLUDES ${SQLITE3_INCLUDE_DIR})
+get_lib_path_from_include(${SQLITE3_INCLUDE_DIRS} SQLITE3_FRAMEWORK_DIRS)
+list(APPEND BUILD_INCLUDES ${SQLITE3_INCLUDE_DIRS})
 list(APPEND BUILD_LIB_DIRS ${SQLITE3_FRAMEWORK_DIRS})
 
 find_anyproject(Spatialite REQUIRED)
 set(SPATIALITE_FRAMEWORK spatialite)
-get_lib_path_from_include(${SPATIALITE_INCLUDE_DIR} SPATIALITE_FRAMEWORK_DIRS)
-#set(BUILD_INCLUDES "${BUILD_INCLUDES}:${SPATIALITE_INCLUDE_DIR}")
-list(APPEND BUILD_INCLUDES ${SPATIALITE_INCLUDE_DIR})
+get_lib_path_from_include(${SPATIALITE_INCLUDE_DIRS} SPATIALITE_FRAMEWORK_DIRS)
+list(APPEND BUILD_INCLUDES ${SPATIALITE_INCLUDE_DIRS})
 list(APPEND BUILD_LIB_DIRS ${SPATIALITE_LIBRARIES_DIR})
-
-# TODO: Do we need ZLIB here?
 
 find_anyproject(PROJ4 DEFAULT ON)
 if(PROJ4_FOUND)
     set(BUILD_EXT_OPTIONS ${BUILD_EXT_OPTIONS} "--with-proj=1")
-    #set(BUILD_INCLUDES "${BUILD_INCLUDES}:${PROJ4_INCLUDE_DIR}")
-    list(APPEND BUILD_INCLUDES ${PROJ4_INCLUDE_DIR})
-    set(PROJ4_FRAMEWORK proj)
-    get_lib_path_from_include(${PROJ4_INCLUDE_DIR} PROJ4_FRAMEWORK_DIRS)
+    list(APPEND BUILD_INCLUDES ${PROJ4_INCLUDE_DIRS})
+    set(PROJ4_FRAMEWORK proj4)
+    get_lib_path_from_include(${PROJ4_INCLUDE_DIRS} PROJ4_FRAMEWORK_DIRS)
     list(APPEND BUILD_LIB_DIRS ${PROJ4_FRAMEWORK_DIRS})
 endif()
 
 find_anyproject(GEOS DEFAULT ON)
 if(GEOS_FOUND)
     set(BUILD_EXT_OPTIONS ${BUILD_EXT_OPTIONS} "--with-geos=1" "--with-geosadvanced=1")
-    #set(BUILD_INCLUDES "${BUILD_INCLUDES}:${GEOS_INCLUDE_DIR}")
-    list(APPEND BUILD_INCLUDES ${GEOS_INCLUDE_DIR})
+    list(APPEND BUILD_INCLUDES ${GEOS_INCLUDE_DIRS})
     set(GEOS_FRAMEWORK geos)
-    get_lib_path_from_include(${GEOS_INCLUDE_DIR} GEOS_FRAMEWORK_DIRS)
+    get_lib_path_from_include(${GEOS_INCLUDE_DIRS} GEOS_FRAMEWORK_DIRS)
     list(APPEND BUILD_LIB_DIRS ${GEOS_FRAMEWORK_DIRS})
 endif()
 
 find_anyproject(ICONV DEFAULT ON)
 if(ICONV_FOUND)
     set(BUILD_EXT_OPTIONS ${BUILD_EXT_OPTIONS} "--with-iconv=1")
-    #set(BUILD_INCLUDES "${BUILD_INCLUDES}:${ICONV_INCLUDE_DIR}")
-    list(APPEND BUILD_INCLUDES ${ICONV_INCLUDE_DIR})
+    list(APPEND BUILD_INCLUDES ${ICONV_INCLUDE_DIRS})
 
     if(WIN32)
-        get_lib_path_from_include(${ICONV_INCLUDE_DIR} ICONV_LIBRARY_DIR)
+        get_lib_path_from_include(${ICONV_INCLUDE_DIRS} ICONV_LIBRARY_DIR)
         list(APPEND BUILD_LIB_DIRS ${ICONV_LIBRARY_DIR})
     endif()
 endif()
@@ -190,84 +223,30 @@ endif()
 find_anyproject(FreeXL)
 if(FREEXL_FOUND)
     set(BUILD_EXT_OPTIONS ${BUILD_EXT_OPTIONS} "--with-freexl=1")
-    #set(BUILD_INCLUDES "${BUILD_INCLUDES}:${FREEXL_INCLUDE_DIR}")
-    list(APPEND BUILD_INCLUDES ${FREEXL_INCLUDE_DIR})
+    list(APPEND BUILD_INCLUDES ${FREEXL_INCLUDE_DIRS})
 
     set(FREEXL_FRAMEWORK freexl)
-    get_lib_path_from_include(${FREEXL_INCLUDE_DIR} FREEXL_FRAMEWORK_DIRS)
+    get_lib_path_from_include(${FREEXL_INCLUDE_DIRS} FREEXL_FRAMEWORK_DIRS)
     list(APPEND BUILD_LIB_DIRS ${FREEXL_FRAMEWORK_DIRS})
 endif()
-
-set(FLAGS)
-if(OSX_FRAMEWORK)
-    set(FLAGS ${FLAGS} "ARCHFLAGS=-arch x86_64")
-else(WIN32)
-    set(FLAGS ${FLAGS} "VS90COMNTOOLS=$ENV{VS120COMNTOOLS}")
-endif()
-
-# if(UNIX)
-#     set(BUILD_EXT_OPTIONS ${BUILD_EXT_OPTIONS} "-DSQLITE_API=__attribute__((dllimport))")
-# else()
-#     set(BUILD_EXT_OPTIONS ${BUILD_EXT_OPTIONS} "-DSQLITE_API=__declspec(dllimport)")
-# endif()
 
 configure_file(${CMAKE_SOURCE_DIR}/cmake/setup.py.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}/setup.py IMMEDIATE @ONLY)
 configure_file(${CMAKE_SOURCE_DIR}/cmake/connection.h.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}/src/connection.h COPYONLY)
 
 macro(build_py ver)
-    if(OSX_FRAMEWORK)
-        string (REPLACE ";" ":" BUILD_INCLUDES "${BUILD_INCLUDES}")
-        set(BUILD_INCLUDES "-I${BUILD_INCLUDES}")
+    add_custom_target(build_py${ver} ALL
+        COMMAND ${CMAKE_COMMAND} -E env "${FLAGS}"
+        ${PYTHON${ver}_EXECUTABLE} setup.py build_ext # ${BUILD_INCLUDES}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}
+        VERBATIM
+    )
 
-        add_custom_target(build_py${ver} ALL
-            COMMAND ${CMAKE_COMMAND} -E env "${FLAGS}" ${PYTHON${ver}_EXECUTABLE} setup.py build_ext -b ${CMAKE_CURRENT_BINARY_DIR}/${PYTHON${ver}_VERSION_MAJOR}.${PYTHON${ver}_VERSION_MINOR}/site-packages ${BUILD_EXT_OPTIONS} "${BUILD_INCLUDES}"
-            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}
-            COMMENT "${BUILD_INCLUDES}"
-            VERBATIM
-        )
+    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+        set(SETUP_OPTS ${SETUP_OPTS} --no-compile --single-version-externally-managed --record=rekord.txt --prefix=${CMAKE_CURRENT_BINARY_DIR}/inst_tmp)
     elseif(WIN32)
-        set(BUILD_INCLUDES "-I${BUILD_INCLUDES}")
-        set(BUILD_LIB_DIRS "-L${BUILD_LIB_DIRS}")
-        set(BUILD_LIB "-lsqlite3_i spatialite iconv")
-        add_custom_target(build_py${ver} ALL
-            COMMAND ${CMAKE_COMMAND} -E env "${FLAGS}" ${PYTHON${ver}_EXECUTABLE} setup.py build_ext -b ${CMAKE_CURRENT_BINARY_DIR}/${PYTHON${ver}_VERSION_MAJOR}.${PYTHON${ver}_VERSION_MINOR}/site-packages ${BUILD_EXT_OPTIONS} "${BUILD_INCLUDES}" "${BUILD_LIB_DIRS}" ${BUILD_LIB}
-            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}
-            VERBATIM
-        )
-    endif()
-endmacro()
-
-# python setup.py install --prefix=/usr/local
-status_message("Install")
-
-if(PYTHON2_EXECUTABLE)
-    build_py(2)
-endif()
-
-if(PYTHON3_EXECUTABLE)
-    build_py(3)
-endif()
-
-if(NOT SKIP_INSTALL_LIBRARIES AND NOT SKIP_INSTALL_ALL )
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    set(SETUP_OPTS "${SETUP_OPTS} --single-version-externally-managed --record=rekord.txt --prefix=${CMAKE_INSTALL_PREFIX}")
-
-    macro(install_mac_py ver)
-        install(CODE "execute_process(
-            COMMAND ${CMAKE_COMMAND} -E env \"${FLAGS}\" ${PYTHON${ver}_EXECUTABLE} setup.py install ${SETUP_OPTS}
-            WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}
-            )")
-    endmacro()
-
-    if(PYTHON2_EXECUTABLE)
-        install_mac_py(2)
-    endif()
-
-    if(PYTHON3_EXECUTABLE)
-        install_mac_py(3)
-    endif()
-elseif(UNIX)
-    macro(install_py ver)
+        string(REPLACE "/" "\\\\" TMP_PATH "${CMAKE_CURRENT_BINARY_DIR}/inst_tmp")
+        set(SETUP_OPTS ${SETUP_OPTS} --no-compile --single-version-externally-managed --record=rekord.txt --prefix=${TMP_PATH})
+    else()
         execute_process ( COMMAND ${PYTHON${ver}_EXECUTABLE} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())" OUTPUT_VARIABLE PY_SITE_PACKAGES OUTPUT_STRIP_TRAILING_WHITESPACE)
 
         set(TEST_CMD "try:
@@ -277,11 +256,8 @@ except ImportError:
     pass")
 
         execute_process ( COMMAND ${PYTHON${ver}_EXECUTABLE} -c ${TEST_CMD} OUTPUT_VARIABLE PY_HAVE_SETUPTOOLS OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-        set(SETUP_OPTS)
-
         if(PY_HAVE_SETUPTOOLS)
-            set(SETUP_OPTS "${SETUP_OPTS} --single-version-externally-managed --record=rekord.txt")
+            set(SETUP_OPTS "${SETUP_OPTS} --no-compile --single-version-externally-managed --record=rekord.txt")
         endif()
 
         string( LENGTH "$ENV{DESTDIR}" DESTDIRLEN )
@@ -299,42 +275,45 @@ except ImportError:
 
         # TODO: do we need --install-lib=$(PYTHON_INSTALL_LIB) ?
 
-        set(SETUP_OPTS "${SETUP_OPTS} --prefix=${CMAKE_INSTALL_PREFIX}")
+        set(SETUP_OPTS "${SETUP_OPTS} --prefix=${CMAKE_CURRENT_BINARY_DIR}/inst_tmp")
 
-        if(NOT SUPPRESS_VERBOSE_OUTPUT)
-            message(STATUS "setup tools options: ${SETUP_OPTS}")
-        endif()
-
-        install(CODE "execute_process(
-                COMMAND ${PYTHON${ver}_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py install ${SETUP_OPTS}
-                WORKING_DIRECTORY  ${CMAKE_CURRENT_BINARY_DIR}
-                )")
-    endmacro()
-
-    if(PYTHON2_EXECUTABLE)
-        install_py(2)
     endif()
+    add_custom_target(install_py${ver} ALL
+        COMMAND ${CMAKE_COMMAND} -E env "${FLAGS}"
+        ${PYTHON${ver}_EXECUTABLE} setup.py install ${SETUP_OPTS}
+        DEPENDS build_py${ver}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}
+        VERBATIM
+    )
+endmacro()
+configure_file(${CMAKE_SOURCE_DIR}/cmake/setup.py.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}/setup.py IMMEDIATE @ONLY)
 
-    if(PYTHON3_EXECUTABLE)
-        install_py(3)
-    endif()
-else()
-    macro(install_win_py ver)
-        set(BINDING_PATH ${CMAKE_CURRENT_BINARY_DIR}/${PYTHON${ver}_VERSION_MAJOR}.${PYTHON${ver}_VERSION_MINOR}/site-packages)
-        install(DIRECTORY "${BINDING_PATH}/"
-                DESTINATION ${INSTALL_LIB_DIR}/Python${PYTHON${ver}_VERSION_MAJOR}${PYTHON${ver}_VERSION_MINOR}/site-packages
-                COMPONENT libraries)
-        install(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}/lib/"
-                DESTINATION ${INSTALL_LIB_DIR}/Python${PYTHON${ver}_VERSION_MAJOR}${PYTHON${ver}_VERSION_MINOR}/site-packages
-                COMPONENT libraries)
-    endmacro()
-
-    if(PYTHON2_EXECUTABLE)
-        install_win_py(2)
-    endif()
-
-    if(PYTHON3_EXECUTABLE)
-        install_win_py(3)
-    endif()
+if(PYTHON2_EXECUTABLE)
+    build_py(2)
 endif()
+
+if(PYTHON3_EXECUTABLE)
+    build_py(3)
 endif()
+
+if(NOT SKIP_INSTALL_LIBRARIES AND NOT SKIP_INSTALL_ALL )
+    install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/inst_tmp/ DESTINATION ${INSTALL_LIB_DIR})
+endif()
+
+# Archiving ====================================================================
+set(PACKAGE_NAME ${PROJECT_NAME})
+
+set(CPACK_PACKAGE_NAME "${PACKAGE_NAME}")
+set(CPACK_PACKAGE_VENDOR "${PACKAGE_VENDOR}")
+set(CPACK_PACKAGE_VERSION "${VERSION}")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PACKAGE_NAME} Installation")
+set(CPACK_PACKAGE_RELOCATABLE TRUE)
+set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+set(CPACK_GENERATOR "ZIP")
+set(CPACK_MONOLITHIC_INSTALL ON)
+set(CPACK_STRIP_FILES TRUE)
+
+# Get cpack zip archive name
+set(CPACK_PACKAGE_FILE_NAME ${PROJECT_CPACK_FILENAME})
+
+include(CPack)
