@@ -208,7 +208,10 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
 
 
         if self.with_geos:
-            ext.include_dirs.append("@GEOS_INCLUDE_DIRS@")
+            geos_include_dirs_str = '@GEOS_INCLUDE_DIRS@'
+            geos_include_dirs = geos_include_dirs_str.split(';')
+
+            ext.include_dirs.extend(geos_include_dirs)
             self.check_header(ext,"geos_c.h")
             # self.check_lib(ext,"GEOSTopologyPreserveSimplify","geos_c","'libgeos_c' is required but it doesn't seem to be installed on this system.",["m","geos"])
             if sys.platform == 'darwin':
@@ -231,7 +234,10 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
             ext.extra_compile_args.append("-DOMIT_ICONV")
 
         if self.with_freexl:
-            ext.include_dirs.extend("@FREEXL_INCLUDE_DIRS@")
+            freexl_include_dirs_str = '@FREEXL_INCLUDE_DIRS@'
+            freexl_include_dirs = freexl_include_dirs_str.split(';')
+
+            ext.include_dirs.extend(freexl_include_dirs)
             self.check_header(ext,"freexl.h")
             # self.check_lib(ext,"freexl_open","freexl","'libfreexl' is required but it doesn't seem to be installed on this system.",["m"])
             if sys.platform == 'darwin':

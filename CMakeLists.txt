@@ -286,7 +286,6 @@ except ImportError:
         VERBATIM
     )
 endmacro()
-configure_file(${CMAKE_SOURCE_DIR}/cmake/setup.py.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/${OUT_DIR_NAME}/setup.py IMMEDIATE @ONLY)
 
 if(PYTHON2_EXECUTABLE)
     build_py(2)
