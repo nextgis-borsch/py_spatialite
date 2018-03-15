@@ -193,7 +193,7 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
 
         if sys.platform == 'win32':
             ext.define_macros.append(("SQLITE_API","__declspec(dllimport)"))
-            ext.libraries.append('sqlite3')
+            ext.libraries.append('sqlite3_i')
             ext.library_dirs.append('@SQLITE3_LIBRARY_DIRS@')
             ext.libraries.append('spatialite')
             ext.library_dirs.append('@SPATIALITE_LIBRARY_DIRS@')
