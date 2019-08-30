@@ -78,7 +78,7 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
 
     # TODO: allow user to define these options
     user_options = build_ext.user_options + [
-        ('with-proj=', None, "build with PROJ4 (default: True)"),
+        ('with-proj=', None, "build with PROJ (default: True)"),
         ('with-geos=', None, "build with GEOS (default: True)"),
         ('with-geosadvanced=', None, "build with GEOS advanced features (default: True)"),
         ('with-iconv=', None, "build with iconv (default: depends on OS)"),
@@ -199,17 +199,17 @@ class OverrideSystemIncludeOrderBuildCommand(build_ext):
             ext.library_dirs.append('@SPATIALITE_LIBRARY_DIRS@')
 
         if self.with_proj:
-            ext.include_dirs.append("@PROJ4_INCLUDE_DIRS@")
+            ext.include_dirs.append("@PROJ_INCLUDE_DIRS@")
             self.check_header(ext,"proj_api.h")
             # self.check_lib(ext,"pj_init_plus", "proj", "'libproj' is required but it doesn't seem to be installed on this system.",["m"])
             if sys.platform == 'darwin':
                 ext.extra_link_args.append('-framework')
-                ext.extra_link_args.append('@PROJ4_FRAMEWORK@')
-                ext.extra_link_args.append('-F@PROJ4_FRAMEWORK_DIRS@')
+                ext.extra_link_args.append('@PROJ_FRAMEWORK@')
+                ext.extra_link_args.append('-F@PROJ_FRAMEWORK_DIRS@')
                 ext.extra_link_args.append('-mmacosx-version-min=@CMAKE_OSX_DEPLOYMENT_TARGET@')
             if sys.platform == 'win32':
-                ext.libraries.append('proj4')
-                ext.library_dirs.append('@PROJ4_LIBRARY_DIRS@')
+                ext.libraries.append('proj')
+                ext.library_dirs.append('@PROJ_LIBRARY_DIRS@')
 
         else:
             ext.extra_compile_args.append("-DOMIT_PROJ")
